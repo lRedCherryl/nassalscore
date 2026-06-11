@@ -10144,29 +10144,38 @@
             const game = d.has ? ax.getGame(d.xi, d.zi) : null;
             const isMax = isLocalMaxX(d.xi, ax.xArr);
 
-            // Новые расчёты для тултипа
-            const actualHours = HOURS[d.xi] || (HLTB_RANGES[d.xi] ? (HLTB_RANGES[d.xi][0] + HLTB_RANGES[d.xi][1]) / 2 : d.xv);
-            const year = typeof d.zv === 'number' && d.zv > 1900 ? d.zv : (axisMode === 'year' ? sliderVal : YEARS[d.zi]);
+            // Расчётные значения
+            const actualHours = HOURS[d.xi] !== undefined ?
+                HOURS[d.xi] :
+                (HLTB_RANGES[d.xi] ? (HLTB_RANGES[d.xi][0] + HLTB_RANGES[d.xi][1]) / 2 : 10);
+
+            const year = (axisMode === 'year') ?
+                sliderVal :
+                (YEARS[d.zi] !== undefined ? YEARS[d.zi] : 2015);
+
             const rating = sliderVal;
 
-            const effective = calculateEffectiveTime(Math.max(actualHours * 1.35, actualHours), actualHours);
+            const hltbApprox = Math.max(actualHours * 1.35, actualHours + 2);
+            const effective = calculateEffectiveTime(hltbApprox, actualHours);
+
             const timePoints = calculateTimePoints(effective);
             const freshBonusAbs = freshnessBonus(year);
             const ratingBonusAbs = ratingBonusFromPct(rating);
 
             const totalPoints = Math.round(timePoints + freshBonusAbs + ratingBonusAbs);
-            const pph = totalPoints / effective;
+            const avgPointsPerHour = effective > 0 ? (totalPoints / effective) : 0;
 
             const freshPerHour = (freshBonusAbs / effective).toFixed(2);
             const ratingPerHour = (ratingBonusAbs / effective).toFixed(2);
 
-            let html = `<div class="tt-row">Время (ставка): <b>${d.rate} оч/ч</b></div>`;
+            let html = `<div class="tt-row">База за время: <b>${timePoints} очков</b></div>`;
 
-            html += `<div class="tt-row">Свежесть (${year}г): <b>+${freshPerHour} оч/ч</b> <span style="color:var(--text3);font-size:11px">(${freshBonusAbs} всего)</span></div>`;
+            html += `<div class="tt-row">Свежесть (${year}г): <b>+${freshPerHour} оч/ч</b> <span style="color:var(--text3);font-size:11px">(+${freshBonusAbs} всего)</span></div>`;
 
-            html += `<div class="tt-row">Рейтинг (${d.rLbl}): <b>+${ratingPerHour} оч/ч</b> <span style="color:var(--text3);font-size:11px">(${ratingBonusAbs} всего)</span></div>`;
+            html += `<div class="tt-row">Рейтинг (${d.rLbl}): <b>+${ratingPerHour} оч/ч</b> <span style="color:var(--text3);font-size:11px">(+${ratingBonusAbs} всего)</span></div>`;
 
-            html += `<div class="tt-total">${pph.toFixed(2)} оч/ч <span style="font-size:11px;color:var(--text3)">итого</span></div>`;
+            html += `<div class="tt-total"><b>${totalPoints}</b> очков за игру</div>`;
+            html += `<div class="tt-row" style="margin-top:4px">Средний темп: <b>${avgPointsPerHour.toFixed(2)} оч/ч</b></div>`;
 
             if (isMax) html += `<div class="tt-max">▲ локальный максимум</div>`;
 
