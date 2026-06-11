@@ -578,22 +578,40 @@ function buildBars(){
 
 // ── SPRITES ───────────────────────────────────────────────────
 const spriteCache={};
-function makeSprite(text,size){
-  const isDark=document.documentElement.getAttribute('data-theme')==='dark';
-  const key=text+'_'+size+'_'+isDark;
-  if(spriteCache[key]) return spriteCache[key].clone();
-  const c2=document.createElement('canvas'); c2.width=512; c2.height=100;
-  const ctx=c2.getContext('2d'); ctx.clearRect(0,0,512,100);
-  ctx.fillStyle=isDark?'#d4d2ca':'#666460';
-  ctx.font=`700 ${Math.round(size*52)}px -apple-system,sans-serif`;
-  ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(text,256,50);
-  const tex=new THREE.CanvasTexture(c2);
-  const mat=new THREE.SpriteMaterial({map:tex,transparent:true});
-  const sp=new THREE.Sprite(mat);
-  sp.scale.set(size*9,size*1.9,1);
-  return sp;
-}
+        function makeSprite(text, size) {
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            const key = text + '_' + size + '_' + isDark;
+            if (spriteCache[key]) return spriteCache[key].clone();
+
+            // Динамическая ширина
+            const tempCtx = document.createElement('canvas').getContext('2d');
+            tempCtx.font = `700 ${Math.round(size * 52)}px -apple-system,sans-serif`;
+            const metrics = tempCtx.measureText(text);
+            const textWidth = Math.ceil(metrics.width) + 40; // запас
+
+            const c2 = document.createElement('canvas');
+            c2.width = Math.max(512, textWidth);
+            c2.height = 100;
+
+            const ctx = c2.getContext('2d');
+            ctx.clearRect(0, 0, c2.width, c2.height);
+            ctx.fillStyle = isDark ? '#d4d2ca' : '#666460';
+            ctx.font = `700 ${Math.round(size * 52)}px -apple-system,sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, c2.width / 2, 50);
+
+            const tex = new THREE.CanvasTexture(c2);
+            const mat = new THREE.SpriteMaterial({
+                map: tex,
+                transparent: true
+            });
+            const sp = new THREE.Sprite(mat);
+            sp.scale.set(size * 9, size * 1.9, 1);
+
+            spriteCache[key] = sp;
+            return sp.clone();
+        }
 
 function buildAxis(ax,mn,mx){
   const ag=new THREE.Group();
