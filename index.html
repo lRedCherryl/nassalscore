@@ -9539,7 +9539,8 @@
         const HOURS = Array.from({
             length: 30
         }, (_, i) => i + 1);
-        const RBUCKETS = ['90–100%', '81–89%', '76–80%', '71–75%', '61–70%', '51–60%', '45–50%', '≤44%'];
+        //  const RBUCKETS = ['90–100%', '81–89%', '76–80%', '71–75%', '61–70%', '51–60%', '45–50%', '≤44%'];
+        const RBUCKETS = ['≤44%', '45–50%', '51–60%', 'б1–75%', '71–75%', '76–80%', '81–89%', '90–100%'];
         const RBUCKET_BONUS = [1, 2, 3, 4, 5, 6, 7, 10];
 
         function getRate(h) {
@@ -9595,7 +9596,7 @@
                 xLabel: 'Время прохождения (ч)',
                 zArr: YEARS,
                 zLabel: 'Год выхода',
-                xTick: (h, i) => h % 5 === 0 ? h + 'ч' : '',
+                xTick: (h, i) => h % 5 === 0 ? h : '',
                 zTick: (y, i) => y % 5 === 0 ? String(y) : '',
                 score: (xi, zi) => getRate(HOURS[xi]) + freshnessBonus(YEARS[zi]) + ratingBonusFromPct(sliderVal),
                 hasGame: (xi, zi) => !!EXISTS_YEAR_HB_RB[YEARS[zi] + '_' + Math.floor(xi / 5) + '_' + ratingBucket(sliderVal)],
@@ -9611,7 +9612,7 @@
                 xLabel: 'Время прохождения (ч)',
                 zArr: RBUCKETS,
                 zLabel: 'Рейтинг HLTB',
-                xTick: (h, i) => h % 5 === 0 ? h + 'ч' : '',
+                xTick: (h, i) => h % 5 === 0 ? h : '',
                 zTick: (r, i) => r,
                 score: (xi, zi) => getRate(HOURS[xi]) + freshnessBonus(sliderVal) + RBUCKET_BONUS[zi],
                 hasGame: (xi, zi) => !!EXISTS_YEAR_HB_RB[sliderVal + '_' + Math.floor(xi / 5) + '_' + zi],
@@ -9664,8 +9665,8 @@
 
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(42, W / H, 0.1, 2000);
-        camera.position.set(32, 26, 44);
-        camera.lookAt(0, 3, 0);
+        camera.position.set(38, 29, 52);
+        camera.lookAt(0, 4, 0);
 
         scene.add(new THREE.AmbientLight(0xffffff, 0.88));
         const dl = new THREE.DirectionalLight(0xffffff, 0.48);
@@ -9691,6 +9692,10 @@
             axisGrp = null,
             selectedOutline = null;
 
+        // Фиксированные целевые длины осей (в мировых единицах)
+        const TARGET_X_WIDTH = 29;
+        const TARGET_Z_WIDTH = 27;
+
         function scoreToColor(s, mn, mx) {
             const c = new THREE.Color();
             c.setHSL((1 - (s - mn) / (mx - mn || 1)) * 0.667, 0.85, 0.52);
@@ -9700,14 +9705,6 @@
         function ghostColor() {
             const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
             return isDark ? new THREE.Color(0.22, 0.22, 0.24) : new THREE.Color(0.78, 0.77, 0.74);
-        }
-
-        function getSX(xLen) {
-            return xLen <= 8 ? 0.78 : 0.58;
-        }
-
-        function getSZ(zLen) {
-            return zLen <= 10 ? 0.76 : 0.52;
         }
 
         function buildBars() {
@@ -9720,8 +9717,12 @@
             const ax = getAxes();
             const xArr = ax.xArr,
                 zArr = ax.zArr;
-            const SX = getSX(xArr.length),
-                SZ = getSZ(zArr.length);
+            const xLen = xArr.length;
+            const zLen = zArr.length;
+
+            // Фиксированная длина осей
+            const SX = TARGET_X_WIDTH / (xLen > 1 ? xLen - 1 : 1);
+            const SZ = TARGET_Z_WIDTH / (zLen > 1 ? zLen - 1 : 1);
 
             let mn = 999,
                 mx = 0;
@@ -9736,8 +9737,8 @@
                     const s = ax.score(xi, zi);
                     const has = ax.hasGame(xi, zi);
                     const ht = (s / MAX_S) * Y_SCALE + 0.08;
-                    const x = (xi - (xArr.length - 1) / 2) * SX;
-                    const z = (zi - (zArr.length - 1) / 2) * SZ;
+                    const x = (xi - (xLen - 1) / 2) * SX;
+                    const z = (zi - (zLen - 1) / 2) * SZ;
 
                     let col, opacity, transparent;
                     if (has) {
@@ -9793,11 +9794,11 @@
                 });
             });
 
-            buildAxis(ax, mn, mx);
+            buildAxis(ax, mn, mx, SX, SZ);
             updateGradBar(mn, mx);
         }
 
-        // ── SPRITES ───────────────────────────────────────────────────
+        // ── SPRITES (оставляем твою последнюю версию) ─────────────────────
         const spriteCache = {};
 
         function makeSprite(text, size) {
@@ -9805,7 +9806,6 @@
             const key = text + '_' + size + '_' + isDark;
             if (spriteCache[key]) return spriteCache[key].clone();
 
-            // Измеряем реальную ширину текста
             const tempCtx = document.createElement('canvas').getContext('2d');
             tempCtx.font = `700 ${Math.round(size * 52)}px -apple-system,sans-serif`;
             const metrics = tempCtx.measureText(text);
@@ -9830,32 +9830,30 @@
             });
             const sp = new THREE.Sprite(mat);
 
-            // === УЛУЧШЕННАЯ ЛОГИКА МАСШТАБА ===
-            const baseScale = size * 9.4; // базовый размер
-            const aspect = c2.width / 125; // нормализуем по ширине
+            const baseScale = size * 9.4;
+            const aspect = c2.width / 125;
 
             let finalScaleX;
-
-            if (text.length > 25) { // длинные подписи (Время прохождения)
-                finalScaleX = baseScale * Math.min(aspect * 0.76, 0.35);
-            } else if (text.length > 12) { // средние
-                finalScaleX = baseScale * Math.min(aspect * 0.88, 1.6);
-            } else { // короткие
-                finalScaleX = baseScale * Math.min(aspect * 0.95, 1.1);
+            if (text.length > 25) {
+                finalScaleX = baseScale * Math.min(aspect * 0.78, 1.4);
+            } else if (text.length > 12) {
+                finalScaleX = baseScale * Math.min(aspect * 0.9, 1.25);
+            } else {
+                finalScaleX = baseScale * Math.min(aspect * 0.96, 1.12);
             }
 
             sp.scale.set(finalScaleX, size * 2.1, 1);
-
             spriteCache[key] = sp;
             return sp.clone();
         }
 
-        function buildAxis(ax, mn, mx) {
+        function buildAxis(ax, mn, mx, SX, SZ) {
             const ag = new THREE.Group();
             const xArr = ax.xArr,
                 zArr = ax.zArr;
-            const SX = getSX(xArr.length),
-                SZ = getSZ(zArr.length);
+            const xLen = xArr.length,
+                zLen = zArr.length;
+
             const axMat = new THREE.LineBasicMaterial({
                 color: 0x888780,
                 transparent: true,
@@ -9867,10 +9865,10 @@
                 return new THREE.Line(g, axMat);
             }
 
-            const xMin = (0 - (xArr.length - 1) / 2) * SX - 0.6,
-                xMax = (xArr.length - 1 - (xArr.length - 1) / 2) * SX + 0.6;
-            const zMin = (0 - (zArr.length - 1) / 2) * SZ - 0.5,
-                zMax = (zArr.length - 1 - (zArr.length - 1) / 2) * SZ + 0.5;
+            const xMin = (0 - (xLen - 1) / 2) * SX - 1.0;
+            const xMax = (xLen - 1 - (xLen - 1) / 2) * SX + 1.0;
+            const zMin = (0 - (zLen - 1) / 2) * SZ - 0.8;
+            const zMax = (zLen - 1 - (zLen - 1) / 2) * SZ + 0.8;
 
             ag.add(axLine(xMin, 0, zMax, xMax, 0, zMax));
             ag.add(axLine(xMin, 0, zMax, xMin, 13, zMax));
@@ -9880,50 +9878,48 @@
             xArr.forEach((xv, xi) => {
                 const lbl = ax.xTick(xv, xi);
                 if (!lbl) return;
-                const x = (xi - (xArr.length - 1) / 2) * SX;
+                const x = (xi - (xLen - 1) / 2) * SX;
                 const sp = makeSprite(lbl, 0.88);
-                sp.position.set(x, -1.9, zMax + 2.2);
+                sp.position.set(x, -2.2, zMax + 2.6);
                 ag.add(sp);
-                ag.add(axLine(x, 0, zMax, x, -0.35, zMax));
+                ag.add(axLine(x, 0, zMax, x, -0.45, zMax));
             });
+
             // Z ticks
             zArr.forEach((zv, zi) => {
                 const lbl = ax.zTick(zv, zi);
                 if (!lbl) return;
-                const z = (zi - (zArr.length - 1) / 2) * SZ;
+                const z = (zi - (zLen - 1) / 2) * SZ;
                 const sp = makeSprite(lbl, 0.82);
-                sp.position.set(xMin - 4.0, -0.5, z);
+                sp.position.set(xMin - 5.2, -0.7, z);
                 ag.add(sp);
             });
+
             // Y ticks
             [4, 8, 12, 16, 20].forEach(v => {
                 const yp = (v / MAX_S) * Y_SCALE;
                 const sp = makeSprite(String(v), 0.72);
-                sp.position.set(xMin - 3.2, yp, zMax + 0.4);
+                sp.position.set(xMin - 3.8, yp, zMax + 0.6);
                 ag.add(sp);
-                ag.add(axLine(xMin, yp, zMax, xMin - 0.55, yp, zMax));
+                ag.add(axLine(xMin, yp, zMax, xMin - 0.7, yp, zMax));
             });
 
-            // Axis labels — positioned safely outside the data
-            // X-axis label — always centred under x axis
-            const lbX = makeSprite(ax.xLabel, 1);
-            lbX.position.set(0, -3.4, zMax + 3.2);
+            // Labels
+            const lbX = makeSprite(ax.xLabel, 1.02);
+            lbX.position.set(0, -4.4, zMax + 3.8);
             ag.add(lbX);
-            // Z-axis label — placed at Z midpoint; x position matches xMin offset
-            // Extend visual length to match X axis width when Z is short
-            const xAxisLen = xMax - xMin;
-            const zAxisLen = zMax - zMin;
-            const zLblScale = axisMode === 'rating' ? 1.04 : Math.max(1.04, 1.04 * (xAxisLen / Math.max(zAxisLen, 1)));
-            const lbZ = makeSprite(ax.zLabel, Math.min(zLblScale, 1));
-            lbZ.position.set(xMin - 6.5, 0.2, (zMin + zMax) / 2);
+            const lbZ = makeSprite(ax.zLabel, 1.06);
+            lbZ.position.set(xMin - 7.8, 0.4, (zMin + zMax) / 2);
             ag.add(lbZ);
-            const lbY = makeSprite('Очки / час', 1);
-            lbY.position.set(xMin - 5, 6.5, zMax + 0.5);
+            const lbY = makeSprite('Очки / час', 1.03);
+            lbY.position.set(xMin - 6, 7.0, zMax + 0.7);
             ag.add(lbY);
 
             pivot.add(ag);
             axisGrp = ag;
         }
+
+        buildBars();
 
         function updateGradBar(mn, mx) {
             const s = Array.from({
