@@ -551,12 +551,16 @@ document.getElementById('darkToggle').addEventListener('change',function(){
   buildBars();
 });
 
-// ── RENDER LOOP ───────────────────────────────────────────────
-function animate(){requestAnimationFrame(animate);renderer.render(scene,camera);}
-animate();
-// Тёмная тема по умолчанию
-document.getElementById('darkToggle').checked = true;
-updateSliderUI();
-</script>
+        // ── RENDER LOOP ───────────────────────────────────────────────
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+        animate();
+        // Тёмная тема по умолчанию
+        document.getElementById('darkToggle').checked = true;
+        updateSliderUI();
+    </script>
 </body>
+
 </html>
