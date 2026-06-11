@@ -1,4 +1,5 @@
-<html lang="ru" data-theme="dark">
+<!DOCTYPE html>
+<html lang="ru">
 
 <head>
     <meta charset="UTF-8" />
@@ -370,11 +371,7 @@
                 <button data-axis="year">Рейтинг × Время · Год</button>
                 <button data-axis="hltb">Год × HLTB · Рейтинг</button>
             </div>
-            <label class="tog">
-                <input type="checkbox" id="darkToggle" checked />
-                <span class="pill"></span>
-                <span>Тёмная</span>
-            </label>
+            <label class="tog"><input type="checkbox" id="darkToggle" /><span class="pill"></span><span>Тёмная</span></label>
         </div>
     </header>
     <main>
@@ -9523,6 +9520,53 @@
             "2025_3_0": true
         };
 
+        // ── CORRECT SCORING LOGIC (полные очки за игру → очки/час) ─────
+        function calculateEffectiveTime(hltb, actual) {
+            if (hltb <= 5) return hltb; // коротыши — без налога на скилл
+            let t_hltb = hltb > 20 ? 20 : hltb; // для длинных игр налог считается от 20ч
+            return (actual + t_hltb) / 2;
+        }
+
+        function calculateTimePoints(effectiveHours) {
+            let points = 0;
+            let h = Math.max(0, effectiveHours);
+
+            // 1–5 часов → 3 очка/час
+            const p1 = Math.min(h, 5);
+            points += p1 * 3;
+            h -= p1;
+
+            // 6–10 часов → 4 очка/час
+            const p2 = Math.min(h, 5);
+            points += p2 * 4;
+            h -= p2;
+
+            // 11–15 часов → 5 очков/час
+            const p3 = Math.min(h, 5);
+            points += p3 * 5;
+            h -= p3;
+
+            // 16+ часов → 6 очков/час
+            if (h > 0) points += h * 6;
+
+            return points;
+        }
+
+        function calculateTotalPoints(hltb, actual, year, ratingPct) {
+            const effective = calculateEffectiveTime(hltb, actual);
+            const timePoints = calculateTimePoints(effective);
+            const freshBonus = freshnessBonus(year);
+            const ratingBonus = ratingBonusFromPct(ratingPct);
+            return Math.round(timePoints + freshBonus + ratingBonus);
+        }
+
+        function getAveragePointsPerHour(hltb, actual, year, ratingPct) {
+            const effective = calculateEffectiveTime(hltb, actual);
+            if (effective <= 0) return 0;
+            const total = calculateTotalPoints(hltb, actual, year, ratingPct);
+            return total / effective; // ← вот главное: полные очки ÷ время
+        }
+
         // ── SCORING ───────────────────────────────────────────────────
         const HLTB_RANGES = [
             [1, 5],
@@ -9590,38 +9634,55 @@
             sliderVal = 75;
 
         function getAxes() {
-            if (axisMode === 'rating') return {
-                xArr: HOURS,
-                xLabel: 'Время прохождения (ч)',
-                zArr: YEARS,
-                zLabel: 'Год выхода',
-                xTick: (h, i) => h % 5 === 0 ? h : '',
-                zTick: (y, i) => y % 5 === 0 ? String(y) : '',
-                score: (xi, zi) => getRate(HOURS[xi]) + freshnessBonus(YEARS[zi]) + ratingBonusFromPct(sliderVal),
-                hasGame: (xi, zi) => !!EXISTS_YEAR_HB_RB[YEARS[zi] + '_' + Math.floor(xi / 5) + '_' + ratingBucket(sliderVal)],
-                getGame: (xi, zi) => GAME_LOOKUP[YEARS[zi] + '_' + Math.floor(xi / 5) + '_' + ratingBucket(sliderVal)],
-                ttLine1: (xi, zi) => HOURS[xi] + 'ч · ' + YEARS[zi] + 'г',
-                rate: (xi) => getRate(HOURS[xi]),
-                fresh: (xi, zi) => freshnessBonus(YEARS[zi]),
-                rBonus: () => ratingBonusFromPct(sliderVal),
-                rLbl: () => ratingLabel(sliderVal),
-            };
-            if (axisMode === 'year') return {
-                xArr: HOURS,
-                xLabel: 'Время прохождения (ч)',
-                zArr: RBUCKETS,
-                zLabel: 'Рейтинг HLTB',
-                xTick: (h, i) => h % 5 === 0 ? h : '',
-                zTick: (r, i) => r,
-                score: (xi, zi) => getRate(HOURS[xi]) + freshnessBonus(sliderVal) + RBUCKET_BONUS[zi],
-                hasGame: (xi, zi) => !!EXISTS_YEAR_HB_RB[sliderVal + '_' + Math.floor(xi / 5) + '_' + zi],
-                getGame: (xi, zi) => GAME_LOOKUP[sliderVal + '_' + Math.floor(xi / 5) + '_' + zi],
-                ttLine1: (xi, zi) => HOURS[xi] + 'ч · ' + RBUCKETS[zi],
-                rate: (xi) => getRate(HOURS[xi]),
-                fresh: (xi, zi) => freshnessBonus(sliderVal),
-                rBonus: (xi, zi) => RBUCKET_BONUS[zi],
-                rLbl: (xi, zi) => RBUCKETS[zi],
-            };
+            if (axisMode === 'rating') {
+                return {
+                    xArr: HOURS,
+                    xLabel: 'Время прохождения (ч)',
+                    zArr: YEARS,
+                    zLabel: 'Год выхода',
+                    xTick: (h, i) => h % 5 === 0 ? h : '',
+                    zTick: (y, i) => y % 5 === 0 ? String(y) : '',
+                    score: (xi, zi) => {
+                        const actualHours = HOURS[xi];
+                        const year = YEARS[zi];
+                        // Примерное HLTB для визуализации (чуть выше actual — типичный налог)
+                        const hltbApprox = Math.max(actualHours * 1.4, actualHours + 2);
+                        return getAveragePointsPerHour(hltbApprox, actualHours, year, sliderVal);
+                    },
+                    hasGame: (xi, zi) => !!EXISTS_YEAR_HB_RB[YEARS[zi] + '_' + Math.floor(xi / 5) + '_' + ratingBucket(sliderVal)],
+                    getGame: (xi, zi) => GAME_LOOKUP[YEARS[zi] + '_' + Math.floor(xi / 5) + '_' + ratingBucket(sliderVal)],
+                    ttLine1: (xi, zi) => HOURS[xi] + 'ч · ' + YEARS[zi] + 'г',
+                    rate: (xi) => getRate(HOURS[xi]),
+                    fresh: (xi, zi) => freshnessBonus(YEARS[zi]),
+                    rBonus: () => ratingBonusFromPct(sliderVal),
+                    rLbl: () => ratingLabel(sliderVal),
+                };
+            }
+
+            if (axisMode === 'year') {
+                return {
+                    xArr: HOURS,
+                    xLabel: 'Время прохождения (ч)',
+                    zArr: RBUCKETS,
+                    zLabel: 'Рейтинг HLTB',
+                    xTick: (h, i) => h % 5 === 0 ? h : '',
+                    zTick: (r, i) => r,
+                    score: (xi, zi) => {
+                        const actualHours = HOURS[xi];
+                        const year = sliderVal;
+                        const hltbApprox = Math.max(actualHours * 1.4, actualHours + 2);
+                        return getAveragePointsPerHour(hltbApprox, actualHours, year, 75); // средний рейтинг
+                    },
+                    hasGame: (xi, zi) => !!EXISTS_YEAR_HB_RB[sliderVal + '_' + Math.floor(xi / 5) + '_' + zi],
+                    getGame: (xi, zi) => GAME_LOOKUP[sliderVal + '_' + Math.floor(xi / 5) + '_' + zi],
+                    ttLine1: (xi, zi) => HOURS[xi] + 'ч · ' + RBUCKETS[zi],
+                    rate: (xi) => getRate(HOURS[xi]),
+                    fresh: (xi, zi) => freshnessBonus(sliderVal),
+                    rBonus: (xi, zi) => RBUCKET_BONUS[zi],
+                    rLbl: (xi, zi) => RBUCKETS[zi],
+                };
+            }
+
             // hltb mode
             return {
                 xArr: HLTB_LABELS,
@@ -9630,11 +9691,16 @@
                 zLabel: 'Год выхода',
                 xTick: (l, i) => l,
                 zTick: (y, i) => y % 5 === 0 ? String(y) : '',
-                score: (xi, zi) => getRate((HLTB_RANGES[xi][0] + HLTB_RANGES[xi][1]) / 2) + freshnessBonus(YEARS[zi]) + ratingBonusFromPct(sliderVal),
+                score: (xi, zi) => {
+                    const hltbRange = HLTB_RANGES[xi];
+                    const hltbMid = (hltbRange[0] + hltbRange[1]) / 2;
+                    const actualHours = hltbMid; // для HLTB режима используем среднее
+                    const year = YEARS[zi];
+                    return getAveragePointsPerHour(hltbMid, actualHours, year, sliderVal);
+                },
                 hasGame: (xi, zi) => !!EXISTS_YEAR_HB_RB[YEARS[zi] + '_' + xi + '_' + ratingBucket(sliderVal)],
                 getGame: (xi, zi) => GAME_LOOKUP[YEARS[zi] + '_' + xi + '_' + ratingBucket(sliderVal)],
                 ttLine1: (xi, zi) => 'HLTB ' + HLTB_LABELS[xi] + 'ч · ' + YEARS[zi] + 'г',
-
                 rate: (xi) => getRate((HLTB_RANGES[xi][0] + HLTB_RANGES[xi][1]) / 2),
                 fresh: (xi, zi) => freshnessBonus(YEARS[zi]),
                 rBonus: () => ratingBonusFromPct(sliderVal),
@@ -10034,22 +10100,86 @@
             const game = d.has ? ax.getGame(d.xi, d.zi) : null;
             const isMax = isLocalMaxX(d.xi, ax.xArr);
 
-            let html = `<div class="tt-row">Ставка: <b>${d.rate} оч/ч</b></div>`;
-            html += `<div class="tt-row">Свежесть: <b>+${d.fresh}</b> · Рейтинг (${d.rLbl}): <b>+${d.rBonus}</b></div>`;
-            html += `<div class="tt-total">${d.s} оч/ч итого</div>`;
+            // Новые расчёты для тултипа
+            const actualHours = HOURS[d.xi] || (HLTB_RANGES[d.xi] ? (HLTB_RANGES[d.xi][0] + HLTB_RANGES[d.xi][1]) / 2 : d.xv);
+            const year = typeof d.zv === 'number' && d.zv > 1900 ? d.zv : (axisMode === 'year' ? sliderVal : YEARS[d.zi]);
+            const rating = sliderVal;
+
+            const effective = calculateEffectiveTime(Math.max(actualHours * 1.35, actualHours), actualHours);
+            const timePoints = calculateTimePoints(effective);
+            const freshBonusAbs = freshnessBonus(year);
+            const ratingBonusAbs = ratingBonusFromPct(rating);
+
+            const totalPoints = Math.round(timePoints + freshBonusAbs + ratingBonusAbs);
+            const pph = totalPoints / effective;
+
+            const freshPerHour = (freshBonusAbs / effective).toFixed(2);
+            const ratingPerHour = (ratingBonusAbs / effective).toFixed(2);
+
+            let html = `<div class="tt-row">Время (ставка): <b>${d.rate} оч/ч</b></div>`;
+
+            html += `<div class="tt-row">Свежесть (${year}г): <b>+${freshPerHour} оч/ч</b> <span style="color:var(--text3);font-size:11px">(${freshBonusAbs} всего)</span></div>`;
+
+            html += `<div class="tt-row">Рейтинг (${d.rLbl}): <b>+${ratingPerHour} оч/ч</b> <span style="color:var(--text3);font-size:11px">(${ratingBonusAbs} всего)</span></div>`;
+
+            html += `<div class="tt-total">${pph.toFixed(2)} оч/ч <span style="font-size:11px;color:var(--text3)">итого</span></div>`;
+
             if (isMax) html += `<div class="tt-max">▲ локальный максимум</div>`;
 
             if (!d.has) {
                 html += `<div class="tt-ghost">Нет игр в этой ячейке</div>`;
-            } else {
+            } else if (game) {
                 html += `<div class="tt-sep">Пример игры:</div>`;
-                if (game) {
-                    html += `<div class="tt-game"><a href="https://howlongtobeat.com/game/${game.id}" target="_blank">${game.name} ↗</a></div>`;
-                    html += `<div class="tt-game-meta">HLTB: ~${game.hltb}ч · рейтинг: ${game.rating}%</div>`;
-                } else {
-                    html += `<div class="tt-nogame">Нет игры для текущего рейтинга</div>`;
-                }
+                html += `<div class="tt-game"><a href="https://howlongtobeat.com/game/${game.id}" target="_blank">${game.name} ↗</a></div>`;
+                html += `<div class="tt-game-meta">HLTB: ~${game.hltb}ч · рейтинг: ${game.rating}%</div>`;
+            } else {
+                html += `<div class="tt-nogame">Нет игры для текущего рейтинга</div>`;
             }
+
+            return html;
+        }
+
+        function buildTTHTML(d) {
+            const ax = getAxes();
+            const game = d.has ? ax.getGame(d.xi, d.zi) : null;
+            const isMax = isLocalMaxX(d.xi, ax.xArr);
+
+            // Новые расчёты для тултипа
+            const actualHours = HOURS[d.xi] || (HLTB_RANGES[d.xi] ? (HLTB_RANGES[d.xi][0] + HLTB_RANGES[d.xi][1]) / 2 : d.xv);
+            const year = typeof d.zv === 'number' && d.zv > 1900 ? d.zv : (axisMode === 'year' ? sliderVal : YEARS[d.zi]);
+            const rating = sliderVal;
+
+            const effective = calculateEffectiveTime(Math.max(actualHours * 1.35, actualHours), actualHours);
+            const timePoints = calculateTimePoints(effective);
+            const freshBonusAbs = freshnessBonus(year);
+            const ratingBonusAbs = ratingBonusFromPct(rating);
+
+            const totalPoints = Math.round(timePoints + freshBonusAbs + ratingBonusAbs);
+            const pph = totalPoints / effective;
+
+            const freshPerHour = (freshBonusAbs / effective).toFixed(2);
+            const ratingPerHour = (ratingBonusAbs / effective).toFixed(2);
+
+            let html = `<div class="tt-row">Время (ставка): <b>${d.rate} оч/ч</b></div>`;
+
+            html += `<div class="tt-row">Свежесть (${year}г): <b>+${freshPerHour} оч/ч</b> <span style="color:var(--text3);font-size:11px">(${freshBonusAbs} всего)</span></div>`;
+
+            html += `<div class="tt-row">Рейтинг (${d.rLbl}): <b>+${ratingPerHour} оч/ч</b> <span style="color:var(--text3);font-size:11px">(${ratingBonusAbs} всего)</span></div>`;
+
+            html += `<div class="tt-total">${pph.toFixed(2)} оч/ч <span style="font-size:11px;color:var(--text3)">итого</span></div>`;
+
+            if (isMax) html += `<div class="tt-max">▲ локальный максимум</div>`;
+
+            if (!d.has) {
+                html += `<div class="tt-ghost">Нет игр в этой ячейке</div>`;
+            } else if (game) {
+                html += `<div class="tt-sep">Пример игры:</div>`;
+                html += `<div class="tt-game"><a href="https://howlongtobeat.com/game/${game.id}" target="_blank">${game.name} ↗</a></div>`;
+                html += `<div class="tt-game-meta">HLTB: ~${game.hltb}ч · рейтинг: ${game.rating}%</div>`;
+            } else {
+                html += `<div class="tt-nogame">Нет игры для текущего рейтинга</div>`;
+            }
+
             return html;
         }
 
@@ -10209,8 +10339,6 @@
             renderer.render(scene, camera);
         }
         animate();
-        // Тёмная тема по умолчанию
-        document.getElementById('darkToggle').checked = true;
         updateSliderUI();
     </script>
 </body>
