@@ -9539,8 +9539,7 @@
         const HOURS = Array.from({
             length: 30
         }, (_, i) => i + 1);
-        //  const RBUCKETS = ['90–100%', '81–89%', '76–80%', '71–75%', '61–70%', '51–60%', '45–50%', '≤44%'];
-        const RBUCKETS = ['≤44%', '45–50%', '51–60%', 'б1–75%', '71–75%', '76–80%', '81–89%', '90–100%'];
+        const RBUCKETS = ['90–100%', '81–89%', '76–80%', '71–75%', '61–70%', '51–60%', '45–50%', '≤44%'];
         const RBUCKET_BONUS = [1, 2, 3, 4, 5, 6, 7, 10];
 
         function getRate(h) {
@@ -9665,8 +9664,8 @@
 
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(42, W / H, 0.1, 2000);
-        camera.position.set(38, 29, 52);
-        camera.lookAt(0, 4, 0);
+        camera.position.set(32, 26, 44);
+        camera.lookAt(0, 3, 0);
 
         scene.add(new THREE.AmbientLight(0xffffff, 0.88));
         const dl = new THREE.DirectionalLight(0xffffff, 0.48);
@@ -9678,11 +9677,21 @@
 
         const pivot = new THREE.Group();
         scene.add(pivot);
-        let rotY = -0.45,
-            rotX = 0.28,
+        // Orbital camera
+        let camTheta = -0.45,
+            camPhi = 1.05,
+            camRadius = 72,
             scl = 1;
-        pivot.rotation.y = rotY;
-        pivot.rotation.x = rotX;
+        const camTarget = new THREE.Vector3(0, 3, 0);
+
+        function updateCamera() {
+            const x = camRadius * Math.sin(camPhi) * Math.sin(camTheta);
+            const y = camRadius * Math.cos(camPhi);
+            const z = camRadius * Math.sin(camPhi) * Math.cos(camTheta);
+            camera.position.set(camTarget.x + x, camTarget.y + y, camTarget.z + z);
+            camera.lookAt(camTarget);
+        }
+        updateCamera();
 
         const MAX_S = 22,
             Y_SCALE = 9,
@@ -9691,10 +9700,6 @@
             pyramidMeshes = [],
             axisGrp = null,
             selectedOutline = null;
-
-        // Фиксированные целевые длины осей (в мировых единицах)
-        const TARGET_X_WIDTH = 29;
-        const TARGET_Z_WIDTH = 27;
 
         function scoreToColor(s, mn, mx) {
             const c = new THREE.Color();
@@ -9707,6 +9712,20 @@
             return isDark ? new THREE.Color(0.22, 0.22, 0.24) : new THREE.Color(0.78, 0.77, 0.74);
         }
 
+        function getSX(xLen) {
+            // Target physical length = (30-1) * 0.58 = 16.82 (same as HOURS axis)
+            const TARGET_LEN = 29 * 0.58;
+            if (xLen <= 1) return 0.78;
+            return TARGET_LEN / (xLen - 1);
+        }
+
+        function getSZ(zLen) {
+            // Target physical length = (32-1) * 0.52 = 16.12 (same as YEARS axis)
+            const TARGET_LEN = 31 * 0.52;
+            if (zLen <= 1) return 0.76;
+            return TARGET_LEN / (zLen - 1);
+        }
+
         function buildBars() {
             barMeshes.forEach(m => pivot.remove(m));
             pyramidMeshes.forEach(m => pivot.remove(m));
@@ -9717,12 +9736,8 @@
             const ax = getAxes();
             const xArr = ax.xArr,
                 zArr = ax.zArr;
-            const xLen = xArr.length;
-            const zLen = zArr.length;
-
-            // Фиксированная длина осей
-            const SX = TARGET_X_WIDTH / (xLen > 1 ? xLen - 1 : 1);
-            const SZ = TARGET_Z_WIDTH / (zLen > 1 ? zLen - 1 : 1);
+            const SX = getSX(xArr.length),
+                SZ = getSZ(zArr.length);
 
             let mn = 999,
                 mx = 0;
@@ -9737,8 +9752,8 @@
                     const s = ax.score(xi, zi);
                     const has = ax.hasGame(xi, zi);
                     const ht = (s / MAX_S) * Y_SCALE + 0.08;
-                    const x = (xi - (xLen - 1) / 2) * SX;
-                    const z = (zi - (zLen - 1) / 2) * SZ;
+                    const x = (xi - (xArr.length - 1) / 2) * SX;
+                    const z = (zi - (zArr.length - 1) / 2) * SZ;
 
                     let col, opacity, transparent;
                     if (has) {
@@ -9794,11 +9809,11 @@
                 });
             });
 
-            buildAxis(ax, mn, mx, SX, SZ);
+            buildAxis(ax, mn, mx);
             updateGradBar(mn, mx);
         }
 
-        // ── SPRITES (оставляем твою последнюю версию) ─────────────────────
+        // ── SPRITES ───────────────────────────────────────────────────
         const spriteCache = {};
 
         function makeSprite(text, size) {
@@ -9839,7 +9854,7 @@
             } else if (text.length > 12) {
                 finalScaleX = baseScale * Math.min(aspect * 0.9, 1.25);
             } else {
-                finalScaleX = baseScale * Math.min(aspect * 0.96, 1.12);
+                finalScaleX = baseScale * Math.min(aspect * 0.23, 1.12);
             }
 
             sp.scale.set(finalScaleX, size * 2.1, 1);
@@ -9847,13 +9862,12 @@
             return sp.clone();
         }
 
-        function buildAxis(ax, mn, mx, SX, SZ) {
+        function buildAxis(ax, mn, mx) {
             const ag = new THREE.Group();
             const xArr = ax.xArr,
                 zArr = ax.zArr;
-            const xLen = xArr.length,
-                zLen = zArr.length;
-
+            const SX = getSX(xArr.length),
+                SZ = getSZ(zArr.length);
             const axMat = new THREE.LineBasicMaterial({
                 color: 0x888780,
                 transparent: true,
@@ -9865,10 +9879,10 @@
                 return new THREE.Line(g, axMat);
             }
 
-            const xMin = (0 - (xLen - 1) / 2) * SX - 1.0;
-            const xMax = (xLen - 1 - (xLen - 1) / 2) * SX + 1.0;
-            const zMin = (0 - (zLen - 1) / 2) * SZ - 0.8;
-            const zMax = (zLen - 1 - (zLen - 1) / 2) * SZ + 0.8;
+            const xMin = (0 - (xArr.length - 1) / 2) * SX - 0.6,
+                xMax = (xArr.length - 1 - (xArr.length - 1) / 2) * SX + 0.6;
+            const zMin = (0 - (zArr.length - 1) / 2) * SZ - 0.5,
+                zMax = (zArr.length - 1 - (zArr.length - 1) / 2) * SZ + 0.5;
 
             ag.add(axLine(xMin, 0, zMax, xMax, 0, zMax));
             ag.add(axLine(xMin, 0, zMax, xMin, 13, zMax));
@@ -9878,48 +9892,50 @@
             xArr.forEach((xv, xi) => {
                 const lbl = ax.xTick(xv, xi);
                 if (!lbl) return;
-                const x = (xi - (xLen - 1) / 2) * SX;
+                const x = (xi - (xArr.length - 1) / 2) * SX;
                 const sp = makeSprite(lbl, 0.88);
-                sp.position.set(x, -2.2, zMax + 2.6);
+                sp.position.set(x, -1.9, zMax + 2.2);
                 ag.add(sp);
-                ag.add(axLine(x, 0, zMax, x, -0.45, zMax));
+                ag.add(axLine(x, 0, zMax, x, -0.35, zMax));
             });
-
             // Z ticks
             zArr.forEach((zv, zi) => {
                 const lbl = ax.zTick(zv, zi);
                 if (!lbl) return;
-                const z = (zi - (zLen - 1) / 2) * SZ;
+                const z = (zi - (zArr.length - 1) / 2) * SZ;
                 const sp = makeSprite(lbl, 0.82);
-                sp.position.set(xMin - 5.2, -0.7, z);
+                sp.position.set(xMin - 4.0, -0.5, z);
                 ag.add(sp);
             });
-
             // Y ticks
             [4, 8, 12, 16, 20].forEach(v => {
                 const yp = (v / MAX_S) * Y_SCALE;
                 const sp = makeSprite(String(v), 0.72);
-                sp.position.set(xMin - 3.8, yp, zMax + 0.6);
+                sp.position.set(xMin - 3.2, yp, zMax + 0.4);
                 ag.add(sp);
-                ag.add(axLine(xMin, yp, zMax, xMin - 0.7, yp, zMax));
+                ag.add(axLine(xMin, yp, zMax, xMin - 0.55, yp, zMax));
             });
 
-            // Labels
-            const lbX = makeSprite(ax.xLabel, 1.02);
-            lbX.position.set(0, -4.4, zMax + 3.8);
+            // Axis labels — positioned safely outside the data
+            // X-axis label — always centred under x axis
+            const lbX = makeSprite(ax.xLabel, 1.08);
+            lbX.position.set(0, -3.4, zMax + 3.2);
             ag.add(lbX);
-            const lbZ = makeSprite(ax.zLabel, 1.06);
-            lbZ.position.set(xMin - 7.8, 0.4, (zMin + zMax) / 2);
+            // Z-axis label — placed at Z midpoint; x position matches xMin offset
+            // Extend visual length to match X axis width when Z is short
+            const xAxisLen = xMax - xMin;
+            const zAxisLen = zMax - zMin;
+            const zLblScale = axisMode === 'rating' ? 1.04 : Math.max(1.04, 1.04 * (xAxisLen / Math.max(zAxisLen, 1)));
+            const lbZ = makeSprite(ax.zLabel, Math.min(zLblScale, 1.8));
+            lbZ.position.set(xMin - 6.5, 0.2, (zMin + zMax) / 2);
             ag.add(lbZ);
-            const lbY = makeSprite('Очки / час', 1.03);
-            lbY.position.set(xMin - 6, 7.0, zMax + 0.7);
+            const lbY = makeSprite('Очки / час', 1.04);
+            lbY.position.set(xMin - 5, 6.5, zMax + 0.5);
             ag.add(lbY);
 
             pivot.add(ag);
             axisGrp = ag;
         }
-
-        buildBars();
 
         function updateGradBar(mn, mx) {
             const s = Array.from({
@@ -9960,20 +9976,18 @@
         window.addEventListener('mousemove', e => {
             if (!isDrag) return;
             const dx = e.clientX - lastX,
-                dy = e.clientY - lastY;
+                dy = lastY - e.clientY;
             if (Math.abs(dx) + Math.abs(dy) > 2) movedInDrag = true;
-            rotY += dx * 0.009;
-            rotX += dy * 0.009;
-            rotX = Math.max(-0.05, Math.min(1.3, rotX));
+            camTheta -= dx * 0.008;
+            camPhi = Math.max(0.15, Math.min(Math.PI - 0.05, camPhi + dy * 0.008));
             lastX = e.clientX;
             lastY = e.clientY;
-            pivot.rotation.y = rotY;
-            pivot.rotation.x = rotX;
+            updateCamera();
         });
         canvasEl.addEventListener('wheel', e => {
             e.preventDefault();
-            scl = Math.max(0.3, Math.min(3.2, scl * (1 - e.deltaY * 0.001)));
-            pivot.scale.setScalar(scl);
+            camRadius = Math.max(18, Math.min(180, camRadius * (1 + e.deltaY * 0.001)));
+            updateCamera();
         }, {
             passive: false
         });
@@ -9997,13 +10011,11 @@
             const dx = e.touches[0].clientX - lastX,
                 dy = e.touches[0].clientY - lastY;
             if (Math.abs(dx) + Math.abs(dy) > 2) movedInDrag = true;
-            rotY += dx * 0.009;
-            rotX += dy * 0.009;
-            rotX = Math.max(-0.05, Math.min(1.3, rotX));
+            camTheta -= dx * 0.008;
+            camPhi = Math.max(0.15, Math.min(Math.PI - 0.05, camPhi + dy * 0.008));
             lastX = e.touches[0].clientX;
             lastY = e.touches[0].clientY;
-            pivot.rotation.y = rotY;
-            pivot.rotation.x = rotX;
+            updateCamera();
         }, {
             passive: true
         });
