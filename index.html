@@ -10095,49 +10095,6 @@
         const mouse = new THREE.Vector2();
         let pinned = false;
 
-        function buildTTHTML(d) {
-            const ax = getAxes();
-            const game = d.has ? ax.getGame(d.xi, d.zi) : null;
-            const isMax = isLocalMaxX(d.xi, ax.xArr);
-
-            // Новые расчёты для тултипа
-            const actualHours = HOURS[d.xi] || (HLTB_RANGES[d.xi] ? (HLTB_RANGES[d.xi][0] + HLTB_RANGES[d.xi][1]) / 2 : d.xv);
-            const year = typeof d.zv === 'number' && d.zv > 1900 ? d.zv : (axisMode === 'year' ? sliderVal : YEARS[d.zi]);
-            const rating = sliderVal;
-
-            const effective = calculateEffectiveTime(Math.max(actualHours * 1.35, actualHours), actualHours);
-            const timePoints = calculateTimePoints(effective);
-            const freshBonusAbs = freshnessBonus(year);
-            const ratingBonusAbs = ratingBonusFromPct(rating);
-
-            const totalPoints = Math.round(timePoints + freshBonusAbs + ratingBonusAbs);
-            const pph = totalPoints / effective;
-
-            const freshPerHour = (freshBonusAbs / effective).toFixed(2);
-            const ratingPerHour = (ratingBonusAbs / effective).toFixed(2);
-
-            let html = `<div class="tt-row">Время (ставка): <b>${d.rate} оч/ч</b></div>`;
-
-            html += `<div class="tt-row">Свежесть (${year}г): <b>+${freshPerHour} оч/ч</b> <span style="color:var(--text3);font-size:11px">(${freshBonusAbs} всего)</span></div>`;
-
-            html += `<div class="tt-row">Рейтинг (${d.rLbl}): <b>+${ratingPerHour} оч/ч</b> <span style="color:var(--text3);font-size:11px">(${ratingBonusAbs} всего)</span></div>`;
-
-            html += `<div class="tt-total">${pph.toFixed(2)} оч/ч <span style="font-size:11px;color:var(--text3)">итого</span></div>`;
-
-            if (isMax) html += `<div class="tt-max">▲ локальный максимум</div>`;
-
-            if (!d.has) {
-                html += `<div class="tt-ghost">Нет игр в этой ячейке</div>`;
-            } else if (game) {
-                html += `<div class="tt-sep">Пример игры:</div>`;
-                html += `<div class="tt-game"><a href="https://howlongtobeat.com/game/${game.id}" target="_blank">${game.name} ↗</a></div>`;
-                html += `<div class="tt-game-meta">HLTB: ~${game.hltb}ч · рейтинг: ${game.rating}%</div>`;
-            } else {
-                html += `<div class="tt-nogame">Нет игры для текущего рейтинга</div>`;
-            }
-
-            return html;
-        }
 
         function buildTTHTML(d) {
             const ax = getAxes();
@@ -10167,8 +10124,10 @@
 
             const freshPerHour = (freshBonusAbs / effective).toFixed(2);
             const ratingPerHour = (ratingBonusAbs / effective).toFixed(2);
+            const timePointsPerHour = (timePoints / effective).toFixed(2);
+            const rdtimepoints = Math.round(timePoints);
 
-            let html = `<div class="tt-row">База за время: <b>${timePoints} очков</b></div>`;
+            let html = `<div class="tt-row">База за время: <b>${timePointsPerHour} оч/к</b> <span style="color:var(--text3);font-size:11px">(+${+rdtimepoints.toFixed(2)} всего)</span></div>`;
 
             html += `<div class="tt-row">Свежесть (${year}г): <b>+${freshPerHour} оч/ч</b> <span style="color:var(--text3);font-size:11px">(+${freshBonusAbs} всего)</span></div>`;
 
