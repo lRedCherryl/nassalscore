@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="dark">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
@@ -87,8 +87,11 @@ input[type=range]{width:100%;accent-color:var(--accent);cursor:pointer;}
       <button class="active" data-axis="rating">Год × Время · Рейтинг</button>
       <button data-axis="year">Рейтинг × Время · Год</button>
       <button data-axis="hltb">Год × HLTB · Рейтинг</button>
-    </div>
-    <label class="tog"><input type="checkbox" id="darkToggle"/><span class="pill"></span><span>Тёмная</span></label>
+    </d<label class="tog">
+  <input type="checkbox" id="darkToggle" checked/>
+  <span class="pill"></span>
+  <span>Тёмная</span>
+</label>
   </div>
 </header>
 <main>
@@ -111,7 +114,7 @@ input[type=range]{width:100%;accent-color:var(--accent);cursor:pointer;}
       <div class="hint">
         ▲ Пирамида — локальный максимум (5,10,15…ч)<br>
         Прозрачный — нет игры в базе<br><br>
-        Перетащите для вращения<br>
+        Зажмите и перетащите для вращения<br>
         Колёсико — масштаб<br>
         Клик — зафиксировать подсказку
       </div>
